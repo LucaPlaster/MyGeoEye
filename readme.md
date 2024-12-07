@@ -1,81 +1,125 @@
-# MonitorService - Sistema de Monitoramento para DataNodes
+# MonitorService - Sistema de Monitoramento com Java RMI
 
-## Introdução
-O **MonitorService** é um componente de um sistema distribuído projetado para monitorar e gerenciar **DataNodes**. Ele desempenha um papel fundamental ao garantir a resiliência do sistema, detectando falhas e substituindo automaticamente nós defeituosos.
+## Descrição
 
-## Funcionalidades
+O **MonitorService** é um componente essencial de um sistema distribuído, implementado usando **Java RMI (Remote Method Invocation)**. Ele é responsável por monitorar, gerenciar falhas e substituir automaticamente **DataNodes** defeituosos para garantir a continuidade do serviço.
 
-### 1. Detecção de falhas
-- Monitora os **DataNodes** registrados no sistema.
-- Detecta falhas notificadas pelo **MasterServer**.
+Este serviço trabalha em conjunto com outros componentes do sistema distribuído, como o **MasterServer** e os **DataNodes**, utilizando **Java RMI** para facilitar a comunicação remota entre eles.
 
-### 2. Substituição de DataNodes falhos
-- Remove o **DataNode** falho do registro do **MasterServer**.
-- Instancia automaticamente um novo **DataNode** com um identificador único.
-- Registra o novo **DataNode** no **MasterServer**.
+---
 
-### 3. Registro do MasterServer
-- O **MonitorService** registra o **MasterServer** como parte do sistema, permitindo que ele seja monitorado e mantenha a integridade do sistema.
+## Objetivo
 
-## Fluxo de Operações
+O objetivo deste projeto é implementar um sistema distribuído resiliente, que:
+- **Detecte falhas automaticamente:** Identifique DataNodes inacessíveis.
+- **Recupere o sistema automaticamente:** Remova nós defeituosos e substitua por novos.
+- **Distribua e gerencie dados:** Garanta alta disponibilidade por meio de um monitoramento ativo e de substituições dinâmicas.
 
-1. **Falha detectada:**
-   - O **MasterServer** notifica o **MonitorService** sobre um **DataNode** falho por meio do método `notifyFailure`.
+---
 
-2. **Remoção do DataNode falho:**
-   - O **MonitorService** chama o método `unregisterDataNode` no **MasterServer** para remover o nó defeituoso.
+## Estrutura do Sistema
 
-3. **Instanciação de um novo DataNode:**
-   - Um novo **DataNode** é criado com um identificador único, utilizando o contador `dataNodeCounter`.
+### Componentes
 
-4. **Registro do novo DataNode:**
-   - O novo nó é iniciado e registrado no **MasterServer**, garantindo a continuidade do sistema.
+1. **MonitorService**
+   - Monitora os **DataNodes** registrados no sistema.
+   - Detecta falhas notificadas pelo **MasterServer**.
+   - Cria e registra novos **DataNodes** para substituir os defeituosos.
 
-## Estrutura do Código
+2. **MasterServer**
+   - Coordena os **DataNodes** no sistema.
+   - Distribui partes de dados para os nós disponíveis.
+   - Notifica o **MonitorService** sobre falhas detectadas.
 
-### Classe `MonitorService`
-A classe implementa a interface `MonitorServiceInterface` e herda de `UnicastRemoteObject` para que possa ser acessada remotamente.
+3. **DataNode**
+   - Armazena partes de dados do sistema distribuído.
+   - É monitorado pelo **MasterServer**.
+   - Pode ser substituído automaticamente em caso de falhas.
 
-### Métodos Principais
+4. **Java RMI**
+   - Facilita a comunicação remota entre o **MonitorService**, **MasterServer** e os **DataNodes**.
+   - Permite que métodos sejam invocados remotamente como se fossem locais.
 
-#### `notifyFailure(String dataNodeId)`
-- **Função:** Detecta a falha de um **DataNode**.
-- **Passos:**
-  1. Remove o nó falho do **MasterServer**.
-  2. Instancia um novo nó substituto.
-  3. Registra o novo nó no **MasterServer**.
+---
 
-#### `registerMasterServer(MasterServerInterface masterServer)`
-- **Função:** Registra o **MasterServer** no **MonitorService**.
-- **Passos:**
-  1. Armazena a referência ao **MasterServer**.
-  2. Exibe uma mensagem de confirmação.
+## Funcionalidades do MonitorService
 
-#### `main(String[] args)`
-- **Função:** Inicia o **MonitorService**.
-- **Passos:**
-  1. Cria uma instância do **MonitorService**.
-  2. Registra o serviço no RMI Registry na porta 2000.
-  3. Exibe mensagens indicando que o serviço está pronto.
+### 1. **Notificação de Falhas**
+- **Método:** `notifyFailure(String dataNodeId)`
+- **Descrição:** Detecta falhas em **DataNodes**.
+- **O que faz:**
+  - Remove o nó defeituoso do sistema por meio do **MasterServer**.
+  - Cria um novo nó substituto.
+  - Registra o novo nó no **MasterServer** para continuidade da operação.
 
-## Exemplo de Execução
+### 2. **Registro do MasterServer**
+- **Método:** `registerMasterServer(MasterServerInterface masterServer)`
+- **Descrição:** Registra o **MasterServer** no **MonitorService**.
+- **O que faz:**
+  - Estabelece a comunicação entre o **MasterServer** e o **MonitorService**.
+  - Permite que o **MasterServer** notifique falhas ao **MonitorService**.
 
-1. O **MasterServer** detecta que um **DataNode** não está acessível.
-2. Chama o método `notifyFailure` do **MonitorService**, passando o ID do nó defeituoso.
+### 3. **Instanciação de Novos DataNodes**
+- **Descrição:** Garante que, após a falha de um nó, o sistema substitua automaticamente o nó defeituoso por um novo.
+- **O que faz:**
+  - Gera um identificador único para o novo **DataNode**.
+  - Inicia o novo **DataNode**.
+  - Registra o nó recém-criado no **MasterServer**.
+
+---
+
+## Fluxo de Operação do Sistema
+
+1. O **MasterServer** detecta a falha de um **DataNode**.
+2. O **MasterServer** notifica o **MonitorService**.
 3. O **MonitorService**:
-   - Remove o nó do registro do **MasterServer**.
+   - Remove o nó defeituoso do sistema.
    - Cria e inicia um novo **DataNode**.
    - Registra o novo nó no **MasterServer**.
+4. O sistema continua funcionando normalmente, sem interrupções.
 
-## Código
+---
+
+## Código Explicado
+
+### Classe `MonitorService`
+
+#### **1. Atributos**
+- `masterServer`:
+  - Referência ao **MasterServer**, usada para remover nós defeituosos e registrar novos nós.
+- `dataNodeCounter`:
+  - Um contador que gera identificadores únicos para novos **DataNodes**.
+
+#### **2. Método `notifyFailure(String dataNodeId)`**
+- **Entrada:**
+  - `dataNodeId`: O identificador do **DataNode** que falhou.
+- **O que faz:**
+  - Remove o nó defeituoso do registro no **MasterServer**.
+  - Cria um novo **DataNode** com um identificador único.
+  - Inicia o novo **DataNode** e o registra no **MasterServer**.
+- **Saída:** 
+  - Substitui o nó falho por um novo.
+
+#### **3. Método `registerMasterServer(MasterServerInterface masterServer)`**
+- **Entrada:**
+  - `masterServer`: A referência ao **MasterServer**.
+- **O que faz:**
+  - Registra o **MasterServer** no **MonitorService** para monitoramento e comunicação.
+- **Saída:**
+  - Estabelece a conexão entre o **MasterServer** e o **MonitorService**.
+
+#### **4. Método `main(String[] args)`**
+- **O que faz:**
+  - Inicia o **MonitorService**.
+  - Cria e registra o serviço no RMI Registry na porta 2000.
+- **Saída:**
+  - Serviço pronto para monitorar o sistema.
+
+---
+
+## Exemplo de Código do MonitorService
 
 ```java
-import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
-import java.util.concurrent.atomic.AtomicInteger;
-
 public class MonitorService extends UnicastRemoteObject implements MonitorServiceInterface {
     private MasterServerInterface masterServer;
     private AtomicInteger dataNodeCounter = new AtomicInteger(0);
