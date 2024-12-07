@@ -4,18 +4,27 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 
-// Classe que implementa o servidor mestre
+// Classe que implementa o servidor mestre responsável pela coordenação de DataNodes
 public class MasterServer extends UnicastRemoteObject implements MasterServerInterface {
+
+    // Mapa para registrar DataNodes disponíveis, associando IDs a instâncias remotas
     private Map<String, DataNodeInterface> dataNodes = Collections.synchronizedMap(new HashMap<>());
+
+    // Mapa para rastrear quais partes de cada imagem estão em quais DataNodes
     private Map<String, Map<Integer, String>> imageParts = Collections.synchronizedMap(new HashMap<>());
+
+    // Fator de replicação das partes das imagens (não implementado neste código)
     private int replicationFactor;
+
+    // Referência ao serviço de monitoramento (MonitorService)
     private MonitorServiceInterface monitorService;
 
+    // Construtor do MasterServer, inicializa o fator de replicação e registra no MonitorService
     protected MasterServer(int replicationFactor) throws RemoteException {
         this.replicationFactor = replicationFactor;
 
-        // Conecta-se ao MonitorService
         try {
+            // Conecta ao MonitorService para registro do MasterServer
             Registry monitorRegistry = LocateRegistry.getRegistry("localhost", 2000);
             monitorService = (MonitorServiceInterface) monitorRegistry.lookup("MonitorService");
             monitorService.registerMasterServer(this);
@@ -25,23 +34,27 @@ public class MasterServer extends UnicastRemoteObject implements MasterServerInt
         }
     }
 
+    // Registra um DataNode no sistema
     @Override
     public void registerDataNode(String dataNodeId, DataNodeInterface dataNode) throws RemoteException {
         dataNodes.put(dataNodeId, dataNode);
         System.out.println("DataNode " + dataNodeId + " registrado.");
     }
 
+    // Remove o registro de um DataNode do sistema
     @Override
     public void unregisterDataNode(String dataNodeId) throws RemoteException {
         dataNodes.remove(dataNodeId);
         System.out.println("DataNode " + dataNodeId + " removido do registro.");
     }
 
+    // Lista os nomes das imagens disponíveis no sistema
     @Override
     public List<String> listImages() throws RemoteException {
         return new ArrayList<>(imageParts.keySet());
     }
 
+    // Recupera informações sobre as partes de uma imagem, retornando os DataNodes que possuem essas partes
     @Override
     public Map<Integer, DataNodeInterface> getImageParts(String imageName) throws RemoteException {
         Map<Integer, DataNodeInterface> partsMap = new HashMap<>();
@@ -57,110 +70,21 @@ public class MasterServer extends UnicastRemoteObject implements MasterServerInt
                     dataNode.ping();
                     partsMap.put(entry.getKey(), dataNode);
                 } catch (RemoteException e) {
+                    // Notifica o serviço de monitoramento caso o DataNode esteja inacessível
                     System.err.println("DataNode " + dataNodeId + " inacessível. Notificando o MonitorService.");
                     notifyMonitorService(dataNodeId);
-                    return null; // Retorna null para indicar que a operação não pôde ser concluída
+                    return null; // Retorna null caso a operação não possa ser concluída
                 }
             }
             return partsMap;
         } else {
-            return null;
+            return null; // Retorna null se a imagem não for encontrada
         }
     }
 
+    // Armazena uma imagem dividindo-a em partes e distribuindo-as pelos DataNodes
     @Override
     public boolean storeImage(String imageName, byte[] imageData, int numParts) throws RemoteException {
         try {
-            int partSize = imageData.length / numParts;
-            Map<Integer, String> partsMap = new HashMap<>();
-
-            List<String> dataNodeIds = new ArrayList<>(dataNodes.keySet());
-            if (dataNodeIds.isEmpty()) {
-                System.err.println("Nenhum DataNode disponível para armazenar a imagem.");
-                return false;
-            }
-
-            Collections.shuffle(dataNodeIds);
-            int dataNodeIndex = 0;
-
-            for (int i = 0; i < numParts; i++) {
-                int start = i * partSize;
-                int end = (i == numParts - 1) ? imageData.length : start + partSize;
-                byte[] partData = Arrays.copyOfRange(imageData, start, end);
-
-                String dataNodeId = dataNodeIds.get(dataNodeIndex % dataNodeIds.size());
-                DataNodeInterface dataNode = dataNodes.get(dataNodeId);
-
-                try {
-                    if (dataNode.uploadPart(imageName, i, partData)) {
-                        partsMap.put(i, dataNodeId);
-                    } else {
-                        System.err.println("Falha ao armazenar a parte " + i + " da imagem '" + imageName + "'.");
-                        return false;
-                    }
-                } catch (RemoteException e) {
-                    System.err.println("DataNode " + dataNodeId + " inacessível durante o upload. Notificando o MonitorService.");
-                    notifyMonitorService(dataNodeId);
-                    return false;
-                }
-
-                dataNodeIndex++;
-            }
-
-            imageParts.put(imageName, partsMap);
-            System.out.println("Imagem '" + imageName + "' armazenada com sucesso.");
-            return true;
-        } catch (Exception e) {
-            System.err.println("Erro ao armazenar a imagem: " + e.getMessage());
-            return false;
-        }
-    }
-
-    @Override
-    public boolean deleteImage(String imageName) throws RemoteException {
-        Map<Integer, String> parts = imageParts.remove(imageName);
-        if (parts != null) {
-            for (Map.Entry<Integer, String> entry : parts.entrySet()) {
-                String dataNodeId = entry.getValue();
-                DataNodeInterface dataNode = dataNodes.get(dataNodeId);
-
-                try {
-                    dataNode.deletePart(imageName, entry.getKey());
-                } catch (RemoteException e) {
-                    System.err.println("DataNode " + dataNodeId + " inacessível durante a exclusão. Notificando o MonitorService.");
-                    notifyMonitorService(dataNodeId);
-                }
-            }
-            System.out.println("Imagem '" + imageName + "' deletada com sucesso.");
-            return true;
-        } else {
-            System.out.println("Imagem '" + imageName + "' não encontrada.");
-            return false;
-        }
-    }
-
-    private void notifyMonitorService(String dataNodeId) {
-        try {
-            monitorService.notifyFailure(dataNodeId);
-        } catch (Exception e) {
-            System.err.println("Erro ao notificar o MonitorService: " + e.getMessage());
-        }
-    }
-
-    public static void main(String[] args) {
-        try {
-            int replicationFactor = 1;
-            if (args.length > 0) {
-                replicationFactor = Integer.parseInt(args[0]);
-            }
-
-            MasterServer masterServer = new MasterServer(replicationFactor);
-            Registry registry = LocateRegistry.createRegistry(1099);
-            registry.rebind("MasterServer", masterServer);
-            System.out.println("MasterServer iniciado e registrado no RMI Registry.");
-        } catch (Exception e) {
-            System.err.println("Erro no MasterServer: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-}
+            int partSize = imageData.length / numParts; // Tamanho de cada parte da imagem
+        
