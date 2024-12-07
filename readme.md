@@ -1,106 +1,145 @@
-# MonitorService - Sistema de Monitoramento com Java RMI
+# Sistema de Gerenciamento Distribuído de Imagens
 
-## Descrição
-
-O **MonitorService** é um componente essencial de um sistema distribuído, implementado usando **Java RMI (Remote Method Invocation)**. Ele é responsável por monitorar, gerenciar falhas e substituir automaticamente **DataNodes** defeituosos para garantir a continuidade do serviço.
-
-Este serviço trabalha em conjunto com outros componentes do sistema distribuído, como o **MasterServer** e os **DataNodes**, utilizando **Java RMI** para facilitar a comunicação remota entre eles.
+Este projeto implementa um sistema de gerenciamento distribuído de imagens utilizando **Java RMI (Remote Method Invocation)**. O sistema é composto por um **servidor mestre (MasterServer)**, múltiplos **nós de dados (DataNodes)**, e um **serviço de monitoramento (MonitorService)**, além de um **cliente** para interação com o sistema.
 
 ---
 
-## Objetivo
+## O que é RMI?
 
-O objetivo deste projeto é implementar um sistema distribuído resiliente, que:
-- **Detecte falhas automaticamente:** Identifique DataNodes inacessíveis.
-- **Recupere o sistema automaticamente:** Remova nós defeituosos e substitua por novos.
-- **Distribua e gerencie dados:** Garanta alta disponibilidade por meio de um monitoramento ativo e de substituições dinâmicas.
+**Java RMI (Remote Method Invocation)** é uma tecnologia que permite a execução de métodos em objetos remotos como se fossem locais. Ele é usado para implementar sistemas distribuídos, onde as operações podem ocorrer em diferentes máquinas conectadas em uma rede.
 
----
-
-## Estrutura do Sistema
-
-### Componentes
-
-1. **MonitorService**
-   - Monitora os **DataNodes** registrados no sistema.
-   - Detecta falhas notificadas pelo **MasterServer**.
-   - Cria e registra novos **DataNodes** para substituir os defeituosos.
-
-2. **MasterServer**
-   - Coordena os **DataNodes** no sistema.
-   - Distribui partes de dados para os nós disponíveis.
-   - Notifica o **MonitorService** sobre falhas detectadas.
-
-3. **DataNode**
-   - Armazena partes de dados do sistema distribuído.
-   - É monitorado pelo **MasterServer**.
-   - Pode ser substituído automaticamente em caso de falhas.
-
-4. **Java RMI**
-   - Facilita a comunicação remota entre o **MonitorService**, **MasterServer** e os **DataNodes**.
-   - Permite que métodos sejam invocados remotamente como se fossem locais.
+**Características do RMI:**
+1. Comunicação transparente entre cliente e servidor.
+2. Uso de interfaces para definir métodos remotos.
+3. Gerenciamento automático de serialização/deserialização de objetos.
 
 ---
 
-## Funcionalidades do MonitorService
+## Estrutura do Projeto
 
-### 1. **Notificação de Falhas**
-- **Método:** `notifyFailure(String dataNodeId)`
-- **Descrição:** Detecta falhas em **DataNodes**.
-- **O que faz:**
-  - Remove o nó defeituoso do sistema por meio do **MasterServer**.
-  - Cria um novo nó substituto.
-  - Registra o novo nó no **MasterServer** para continuidade da operação.
+### **1. MasterServer (Servidor Mestre)**
 
-### 2. **Registro do MasterServer**
-- **Método:** `registerMasterServer(MasterServerInterface masterServer)`
-- **Descrição:** Registra o **MasterServer** no **MonitorService**.
-- **O que faz:**
-  - Estabelece a comunicação entre o **MasterServer** e o **MonitorService**.
-  - Permite que o **MasterServer** notifique falhas ao **MonitorService**.
+#### **Funções Principais**
+- Gerenciar as imagens armazenadas no sistema.
+- Distribuir as partes das imagens entre os **DataNodes**.
+- Coordenar operações de upload, download e exclusão de imagens.
+- Detectar falhas nos **DataNodes** através do **MonitorService**.
 
-### 3. **Instanciação de Novos DataNodes**
-- **Descrição:** Garante que, após a falha de um nó, o sistema substitua automaticamente o nó defeituoso por um novo.
-- **O que faz:**
-  - Gera um identificador único para o novo **DataNode**.
-  - Inicia o novo **DataNode**.
-  - Registra o nó recém-criado no **MasterServer**.
+#### **Métodos**
 
----
-
-## Fluxo de Operação do Sistema
-
-1. O **MasterServer** detecta a falha de um **DataNode**.
-2. O **MasterServer** notifica o **MonitorService**.
-3. O **MonitorService**:
-   - Remove o nó defeituoso do sistema.
-   - Cria e inicia um novo **DataNode**.
-   - Registra o novo nó no **MasterServer**.
-4. O sistema continua funcionando normalmente, sem interrupções.
-
----
-
-## Código Explicado
-
-### Classe `MonitorService`
-
-#### **1. Atributos**
-- `masterServer`:
-  - Referência ao **MasterServer**, usada para remover nós defeituosos e registrar novos nós.
-- `dataNodeCounter`:
-  - Um contador que gera identificadores únicos para novos **DataNodes**.
-
-#### **2. Método `notifyFailure(String dataNodeId)`**
+##### **1. Método `registerDataNode(String dataNodeId, DataNodeInterface dataNode)`**
 - **Entrada:**
-  - `dataNodeId`: O identificador do **DataNode** que falhou.
+  - `dataNodeId`: Identificador único do **DataNode**.
+  - `dataNode`: Instância do **DataNodeInterface**.
 - **O que faz:**
-  - Remove o nó defeituoso do registro no **MasterServer**.
-  - Cria um novo **DataNode** com um identificador único.
-  - Inicia o novo **DataNode** e o registra no **MasterServer**.
-- **Saída:** 
+  - Registra um novo **DataNode** no sistema.
+- **Saída:**
+  - Atualiza o registro de **DataNodes** ativos.
+
+##### **2. Método `unregisterDataNode(String dataNodeId)`**
+- **Entrada:**
+  - `dataNodeId`: Identificador do **DataNode** que será removido.
+- **O que faz:**
+  - Remove o registro do **DataNode** em caso de falha.
+- **Saída:**
+  - Atualiza o registro de **DataNodes** ativos.
+
+##### **3. Método `listImages()`**
+- **Entrada:**
+  - Nenhuma.
+- **O que faz:**
+  - Retorna uma lista de imagens disponíveis no sistema.
+- **Saída:**
+  - Lista de nomes das imagens armazenadas.
+
+##### **4. Método `storeImage(String imageName, byte[] imageData, int numParts)`**
+- **Entrada:**
+  - `imageName`: Nome da imagem.
+  - `imageData`: Dados binários da imagem.
+  - `numParts`: Número de partes em que a imagem será dividida.
+- **O que faz:**
+  - Divide a imagem em partes e distribui entre os **DataNodes**.
+- **Saída:**
+  - Armazena a imagem e atualiza o mapeamento entre as partes e os **DataNodes**.
+
+##### **5. Método `deleteImage(String imageName)`**
+- **Entrada:**
+  - `imageName`: Nome da imagem.
+- **O que faz:**
+  - Remove as partes da imagem de todos os **DataNodes**.
+- **Saída:**
+  - Atualiza o registro de imagens e remove os dados do sistema.
+
+---
+
+### **2. DataNode (Nó de Dados)**
+
+#### **Funções Principais**
+- Armazenar partes de imagens.
+- Fornecer partes das imagens sob demanda para download.
+- Excluir partes de imagens quando solicitado.
+- Reportar sua disponibilidade ao servidor mestre.
+
+#### **Métodos**
+
+##### **1. Método `uploadPart(String imageName, int partNumber, byte[] data)`**
+- **Entrada:**
+  - `imageName`: Nome da imagem.
+  - `partNumber`: Número da parte da imagem.
+  - `data`: Dados binários da parte.
+- **O que faz:**
+  - Armazena uma parte da imagem localmente.
+- **Saída:**
+  - Confirmação do armazenamento.
+
+##### **2. Método `downloadPart(String imageName, int partNumber)`**
+- **Entrada:**
+  - `imageName`: Nome da imagem.
+  - `partNumber`: Número da parte a ser recuperada.
+- **O que faz:**
+  - Lê e retorna os dados da parte da imagem armazenada.
+- **Saída:**
+  - Dados binários da parte solicitada.
+
+##### **3. Método `deletePart(String imageName, int partNumber)`**
+- **Entrada:**
+  - `imageName`: Nome da imagem.
+  - `partNumber`: Número da parte a ser excluída.
+- **O que faz:**
+  - Exclui a parte da imagem localmente.
+- **Saída:**
+  - Confirmação da exclusão.
+
+##### **4. Método `ping()`**
+- **Entrada:**
+  - Nenhuma.
+- **O que faz:**
+  - Verifica se o **DataNode** está ativo.
+- **Saída:**
+  - Retorna `true` se o nó estiver ativo.
+
+---
+
+### **3. MonitorService (Serviço de Monitoramento)**
+
+#### **Funções Principais**
+- Monitorar falhas nos **DataNodes**.
+- Notificar o **MasterServer** sobre falhas detectadas.
+- Instanciar novos **DataNodes** em caso de falhas para manter a disponibilidade.
+
+#### **Métodos**
+
+##### **1. Método `notifyFailure(String dataNodeId)`**
+- **Entrada:**
+  - `dataNodeId`: Identificador do nó que falhou.
+- **O que faz:**
+  - Notifica o **MasterServer** sobre a falha.
+  - Remove o nó falho do sistema.
+  - Instancia um novo **DataNode** para substituí-lo.
+- **Saída:**
   - Substitui o nó falho por um novo.
 
-#### **3. Método `registerMasterServer(MasterServerInterface masterServer)`**
+##### **2. Método `registerMasterServer(MasterServerInterface masterServer)`**
 - **Entrada:**
   - `masterServer`: A referência ao **MasterServer**.
 - **O que faz:**
@@ -108,7 +147,7 @@ O objetivo deste projeto é implementar um sistema distribuído resiliente, que:
 - **Saída:**
   - Estabelece a conexão entre o **MasterServer** e o **MonitorService**.
 
-#### **4. Método `main(String[] args)`**
+##### **3. Método `main(String[] args)`**
 - **O que faz:**
   - Inicia o **MonitorService**.
   - Cria e registra o serviço no RMI Registry na porta 2000.
@@ -117,43 +156,17 @@ O objetivo deste projeto é implementar um sistema distribuído resiliente, que:
 
 ---
 
-## Exemplo de Código do MonitorService
+### **4. Client (Cliente)**
 
-```java
-public class MonitorService extends UnicastRemoteObject implements MonitorServiceInterface {
-    private MasterServerInterface masterServer;
-    private AtomicInteger dataNodeCounter = new AtomicInteger(0);
+#### **Funções Principais**
+- Interagir com o **MasterServer** para realizar operações.
+- Permitir que o usuário faça:
+  - Upload de imagens.
+  - Download de imagens.
+  - Exclusão de imagens.
+  - Listagem de imagens disponíveis.
+  - Teste de desempenho.
 
-    protected MonitorService() throws RemoteException {
-        super();
-    }
-
-    @Override
-    public void notifyFailure(String dataNodeId) throws RemoteException {
-        System.out.println("MonitorService: Falha detectada no DataNode " + dataNodeId);
-        masterServer.unregisterDataNode(dataNodeId);
-        String newDataNodeId = "DataNode_" + dataNodeCounter.incrementAndGet();
-        DataNode newDataNode = new DataNode(newDataNodeId);
-        newDataNode.start();
-        masterServer.registerDataNode(newDataNodeId, newDataNode);
-        System.out.println("MonitorService: Novo DataNode " + newDataNodeId + " instanciado e registrado.");
-    }
-
-    @Override
-    public void registerMasterServer(MasterServerInterface masterServer) throws RemoteException {
-        this.masterServer = masterServer;
-        System.out.println("MonitorService: MasterServer registrado para monitoramento.");
-    }
-
-    public static void main(String[] args) {
-        try {
-            MonitorService monitorService = new MonitorService();
-            Registry registry = LocateRegistry.createRegistry(2000);
-            registry.rebind("MonitorService", monitorService);
-            System.out.println("MonitorService iniciado e registrado no RMI Registry.");
-        } catch (Exception e) {
-            System.err.println("Erro no MonitorService: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-}
+#### **Fluxo Geral**
+1. O cliente se conecta ao **MasterServer** via RMI.
+2. Realiza as operações solicitadas pelo usuário.
